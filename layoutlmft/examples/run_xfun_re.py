@@ -26,6 +26,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 from transformers import LayoutXLMTokenizerFast
+from layoutlmft.models.layoutxlm import LayoutXLMForRelationExtraction
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,7 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    model = AutoModelForRelationExtraction.from_pretrained(
+    model = LayoutXLMForRelationExtraction.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
