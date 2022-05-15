@@ -42,7 +42,7 @@ check_min_version("4.5.0")
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-log_file = "./logs/run_xfun_ser.log"
+log_file = "/home/jupyter/fetch/logs/run_xfun_ser.log"
 
 
 def main():
