@@ -79,3 +79,4 @@ class DataTrainingArguments:
 class XFUNDataTrainingArguments(DataTrainingArguments):
     lang: Optional[str] = field(default="en")
     additional_langs: Optional[str] = field(default=None)
+    load_from_disk: Optional[str] = field(default=None)

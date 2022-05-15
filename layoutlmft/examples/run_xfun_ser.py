@@ -6,9 +6,16 @@ import os
 import sys
 from dataclasses import dataclass, field
 from typing import Optional
+from layoutlmft import data
 
 import numpy as np
-from datasets import ClassLabel, load_dataset, load_metric
+from datasets import (
+    ClassLabel,
+    load_dataset,
+    load_metric,
+    load_from_disk,
+    DatasetDict,
+)
 
 import layoutlmft.data.datasets.xfun
 import transformers
@@ -34,6 +41,8 @@ from transformers import LayoutXLMTokenizerFast
 check_min_version("4.5.0")
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+log_file = "./logs/run_xfun_ser.log"
 
 
 def main():
@@ -45,6 +54,10 @@ def main():
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    data_args: XFUNDataTrainingArguments
+    model_args: ModelArguments
+    training_args: TrainingArguments
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -62,10 +75,11 @@ def main():
             )
 
     # Setup logging
+    file_handler = logging.FileHandler(log_file)
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
-        handlers=[logging.StreamHandler(sys.stdout)],
+        handlers=[logging.StreamHandler(sys.stdout), file_handler],
     )
     logger.setLevel(logging.INFO if is_main_process(training_args.local_rank) else logging.WARN)
 
@@ -76,19 +90,25 @@ def main():
     )
     # Set the verbosity to info of the Transformers logger (on main process only):
     if is_main_process(training_args.local_rank):
-        transformers.utils.logging.set_verbosity_info()
+        transformers.utils.logging.set_verbosity_debug()
         transformers.utils.logging.enable_default_handler()
         transformers.utils.logging.enable_explicit_format()
+        transformers.utils.logging.add_handler(file_handler)
+
     logger.info(f"Training/evaluation parameters {training_args}")
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
-    datasets = load_dataset(
-        os.path.abspath(layoutlmft.data.datasets.xfun.__file__),
-        f"xfun.{data_args.lang}",
-        additional_langs=data_args.additional_langs,
-        keep_in_memory=True,
-    )
+    if data_args.load_from_disk:
+        datasets = load_from_disk(data_args.load_from_disk)
+    else:
+        datasets = load_dataset(
+            os.path.abspath(layoutlmft.data.datasets.xfun.__file__),
+            f"xfun.{data_args.lang}",
+            additional_langs=data_args.additional_langs,
+            keep_in_memory=True,
+        )
+
     if training_args.do_train:
         column_names = datasets["train"].column_names
         features = datasets["train"].features
@@ -139,8 +159,6 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    print("ESTOY USANDO ESTE TOKENIZER")
-    print(tokenizer)
     model = AutoModelForTokenClassification.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
